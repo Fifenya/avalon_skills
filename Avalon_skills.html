@@ -10,51 +10,96 @@
             color: #e8dcc8;
             font-family: monospace;
             padding: 20px;
+            margin: 0;
         }
         .status {
             background: #1a1a2e;
             padding: 20px;
             border-radius: 16px;
             margin: 10px 0;
+            word-wrap: break-word;
         }
         button {
             background: #4a2f8d;
             color: #ffd700;
             border: none;
-            padding: 10px 20px;
+            padding: 12px 24px;
             border-radius: 20px;
             margin: 5px;
             cursor: pointer;
+            font-size: 16px;
+        }
+        button:active {
+            transform: scale(0.97);
         }
         .success { color: #22c55e; }
         .error { color: #ef4444; }
         .info { color: #3b82f6; }
+        .log-entry {
+            margin-top: 5px;
+            padding: 5px;
+            border-bottom: 1px solid rgba(210,180,140,0.1);
+        }
     </style>
 </head>
 <body>
     <h1>🔌 Тест связи с ботом</h1>
     
     <div class="status" id="status">
-        Проверка подключения...
+        ⏳ Инициализация...
     </div>
     
-    <button onclick="sendTest()">📤 Отправить тест боту</button>
+    <button onclick="sendTest()">📤 Отправить тест</button>
     <button onclick="requestData()">📊 Запросить данные</button>
+    <button onclick="clearLog()">🗑️ Очистить лог</button>
     
-    <div id="log" class="status" style="font-size: 12px;"></div>
+    <div class="status">
+        <div style="font-weight: bold; margin-bottom: 10px;">📋 Лог событий:</div>
+        <div id="log" style="font-size: 12px; max-height: 300px; overflow-y: auto;"></div>
+    </div>
 
     <script>
+        // Инициализация Telegram WebApp
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
         
-        const userId = tg.initDataUnsafe?.user?.id || 'test';
-        document.getElementById('status').innerHTML = `✅ Telegram WebApp готов<br>🆔 User ID: ${userId}`;
+        // Показываем кнопку "Закрыть" внизу
+        tg.MainButton.setText("✕ Закрыть");
+        tg.MainButton.onClick(() => tg.close());
+        tg.MainButton.show();
+        
+        const userId = tg.initDataUnsafe?.user?.id || 'тестовый';
+        const userName = tg.initDataUnsafe?.user?.first_name || 'Гость';
+        
+        document.getElementById('status').innerHTML = `
+            ✅ Telegram WebApp готов<br>
+            👤 Пользователь: ${userName}<br>
+            🆔 ID: ${userId}<br>
+            🌐 Платформа: ${tg.platform || 'unknown'}
+        `;
         
         function addLog(message, type = 'info') {
             const logDiv = document.getElementById('log');
-            const color = type === 'success' ? '#22c55e' : (type === 'error' ? '#ef4444' : '#3b82f6');
-            logDiv.innerHTML += `<div style="color: ${color}; margin-top: 5px;">${new Date().toLocaleTimeString()}: ${message}</div>`;
+            const time = new Date().toLocaleTimeString();
+            let color = '#3b82f6';
+            let icon = 'ℹ️';
+            
+            if (type === 'success') {
+                color = '#22c55e';
+                icon = '✅';
+            } else if (type === 'error') {
+                color = '#ef4444';
+                icon = '❌';
+            }
+            
+            logDiv.innerHTML += `<div class="log-entry" style="color: ${color}">${time} ${icon} ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+            addLog('Лог очищен');
         }
         
         function sendTest() {
@@ -72,16 +117,33 @@
             tg.sendData(JSON.stringify({ action: 'get_prestige_data' }));
         }
         
-        window.handleBotResponse = function(data) {
-            addLog(`📥 Ответ от бота: ${JSON.stringify(data)}`, 'success');
-            tg.showPopup({
-                title: 'Ответ получен',
-                message: JSON.stringify(data, null, 2),
-                buttons: [{type: 'ok'}]
-            });
+        // Обработка ответов от бота
+        window.handleBotResponse = function(response) {
+            addLog(`📥 Ответ: ${response}`, 'success');
+            
+            try {
+                const data = JSON.parse(response);
+                tg.showPopup({
+                    title: '📥 Ответ от бота',
+                    message: JSON.stringify(data, null, 2).substring(0, 200),
+                    buttons: [{type: 'ok'}]
+                });
+            } catch(e) {
+                tg.showPopup({
+                    title: '📥 Ответ',
+                    message: response.substring(0, 200),
+                    buttons: [{type: 'ok'}]
+                });
+            }
         };
         
-        addLog('🚀 Mini App загружен, ожидаем ответа от бота...');
+        addLog('🚀 Mini App загружен, ожидаем команды...');
+        addLog(`📌 Отправь тестовое сообщение боту, он должен ответить`);
+        
+        // Предупреждение если нет связи
+        setTimeout(() => {
+            addLog('⚠️ Если бот не отвечает, проверь что он запущен', 'error');
+        }, 5000);
     </script>
 </body>
 </html>
