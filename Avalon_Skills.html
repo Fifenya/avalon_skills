@@ -87,6 +87,11 @@
             color: #e0e0e0;
         }
 
+        .diploma-none {
+            background: linear-gradient(135deg, #4b5563, #374151);
+            color: #9ca3af;
+        }
+
         .faculty-badge {
             display: inline-flex;
             align-items: center;
@@ -118,6 +123,36 @@
             font-size: 12px;
             color: #b8a88c;
             letter-spacing: 2px;
+        }
+
+        .no-diploma-warning {
+            background: linear-gradient(135deg, rgba(220,38,38,0.2), rgba(0,0,0,0.6));
+            border: 1px solid #ef4444;
+            border-radius: 20px;
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .no-diploma-warning h3 {
+            color: #ef4444;
+            margin-bottom: 12px;
+        }
+
+        .no-diploma-warning p {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 16px;
+        }
+
+        .no-diploma-warning button {
+            background: linear-gradient(135deg, #4a2f8d, #2a1a5e);
+            border: none;
+            border-radius: 40px;
+            padding: 12px 24px;
+            color: #ffd700;
+            font-weight: bold;
+            cursor: pointer;
         }
 
         .tabs {
@@ -444,10 +479,11 @@
             tg.close();
         }
 
-        // ========== ПОЛУЧЕНИЕ ДАННЫХ ИЗ БОТА ==========
+        // ========== ДАННЫЕ ИГРОКА (приходят из бота) ==========
         let playerData = {
-            diploma_type: 'red',      // 'red' или 'blue'
-            faculty: 'fire',          // 'water', 'earth', 'fire', 'lightning'
+            has_diploma: true,           // ЕСТЬ ЛИ ДИПЛОМ? (true/false)
+            diploma_type: 'red',          // 'red' или 'blue' (если есть диплом)
+            faculty: 'fire',              // 'water', 'earth', 'fire', 'lightning'
             prestige_points: 7,
             level: 15,
             branches: {}
@@ -579,7 +615,8 @@
             
             // Демо-данные (в реальном боте заменятся на данные из БД)
             playerData = {
-                diploma_type: 'red',
+                has_diploma: true,        // ЕСТЬ ЛИ ДИПЛОМ? true/false
+                diploma_type: 'red',       // 'red' или 'blue'
                 faculty: 'fire',
                 prestige_points: 7,
                 level: 15,
@@ -593,15 +630,21 @@
                 }
             };
             
-            const facultyBranches = FACULTY_BRANCHES[playerData.faculty];
-            if (facultyBranches && facultyBranches.branches.length > 0) {
-                currentBranchId = facultyBranches.branches[0].id;
+            const facultyData = FACULTY_BRANCHES[playerData.faculty];
+            if (facultyData && facultyData.branches.length > 0) {
+                currentBranchId = facultyData.branches[0].id;
             }
             
             renderApp();
         }
 
         function renderApp() {
+            // ===== ГЛАВНАЯ ПРОВЕРКА: ЕСТЬ ЛИ ДИПЛОМ? =====
+            if (!playerData.has_diploma) {
+                renderNoDiplomaScreen();
+                return;
+            }
+            
             const facultyData = FACULTY_BRANCHES[playerData.faculty];
             const isRed = playerData.diploma_type === 'red';
             
@@ -619,11 +662,13 @@
 
                 <div class="tabs">
                     ${facultyData.branches.map(branch => {
-                        const isUnlocked = branch.is_unlocked_by_red ? isRed : true;
-                        const isLockedClass = !isUnlocked ? 'locked' : '';
+                        // Проверка: нужен ли красный диплом для этой ветки?
+                        const needsRed = branch.is_unlocked_by_red === true;
+                        const isAvailable = !needsRed || (needsRed && isRed);
+                        const isLockedClass = !isAvailable ? 'locked' : '';
                         return `
                             <div class="tab ${currentBranchId === branch.id ? 'active' : ''} ${isLockedClass}" 
-                                 onclick="${isUnlocked ? `selectBranch('${branch.id}')` : ''}">
+                                 onclick="${isAvailable ? `selectBranch('${branch.id}')` : ''}">
                                 ${branch.emoji} ${branch.name}
                             </div>
                         `;
@@ -636,6 +681,24 @@
                 html += renderSkillTree(currentBranch);
             }
 
+            document.getElementById('app').innerHTML = html;
+        }
+
+        function renderNoDiplomaScreen() {
+            const html = `
+                <div class="header">
+                    <div class="diploma-badge diploma-none">
+                        ❌ НЕТ ДИПЛОМА
+                    </div>
+                </div>
+                
+                <div class="no-diploma-warning">
+                    <h3>🎓 ДИПЛОМ НЕ НАЙДЕН</h3>
+                    <p>Для доступа к дереву навыков необходимо получить диплом в Академии Магии.</p>
+                    <p>📜 Диплом открывает доступ к прокачке способностей и очкам престижа.</p>
+                    <button onclick="closeApp()">🎓 В АКАДЕМИЮ</button>
+                </div>
+            `;
             document.getElementById('app').innerHTML = html;
         }
 
@@ -745,22 +808,6 @@
             }
             if (stat === 'revive') return `${icon} ${name}: +${value ? 'Да' : 'Нет'}`;
             return `${icon} ${name}: +${value}`;
-        }
-
-        function getStatIcon(stat) {
-            const icons = {
-                power: '⚔️', hp: '❤️', mana: '💙', armor: '🛡️',
-                crit: '💥', dodge: '💨', block: '🛡️', spell_damage: '✨'
-            };
-            return icons[stat] || '📊';
-        }
-
-        function getStatName(stat) {
-            const names = {
-                power: 'Сила', hp: 'Здоровье', mana: 'Мана', armor: 'Броня',
-                crit: 'Крит шанс', dodge: 'Уворот', block: 'Блок', spell_damage: 'Урон заклинаний'
-            };
-            return names[stat] || stat;
         }
 
         function escapeHtml(str) {
